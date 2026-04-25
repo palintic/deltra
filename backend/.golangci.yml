@@ -1,0 +1,26 @@
+linters-settings:
+  govet:
+    enable-all: true
+  gocyclo:
+    min-complexity: 15
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - typecheck
+    - gofmt
+    - goimports
+    - gocyclo
+    - goconst
+
+issues:
+  exclude-use-default: false
