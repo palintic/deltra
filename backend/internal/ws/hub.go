@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -86,20 +87,34 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Hub) Broadcast(msg Message) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
 	data, err := json.Marshal(msg)
 	if err != nil {
 		log.Println("JSON marshal error:", err)
 		return
 	}
 
+	// Snapshot client list so writes happen outside the lock.
+	h.mu.Lock()
+	conns := make([]*websocket.Conn, 0, len(h.clients))
 	for conn := range h.clients {
-		err := conn.WriteMessage(websocket.TextMessage, data)
-		if err != nil {
+		conns = append(conns, conn)
+	}
+	h.mu.Unlock()
+
+	var failed []*websocket.Conn
+	for _, conn := range conns {
+		conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+			failed = append(failed, conn)
+		}
+	}
+
+	if len(failed) > 0 {
+		h.mu.Lock()
+		for _, conn := range failed {
 			conn.Close()
 			delete(h.clients, conn)
 		}
+		h.mu.Unlock()
 	}
 }
